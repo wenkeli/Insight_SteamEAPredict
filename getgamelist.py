@@ -1,4 +1,6 @@
 import re
+import datetime
+import dateutil
 
 import urllib
 import requests
@@ -7,25 +9,38 @@ import json
 import copy
 import os
 import pandas as pd
+import numpy as np
+
+import pickle as pkl
 
 import getWebAPIData as gwad
 
 
-def extractAppIDFromFile(fName, reExp):
-    result=[]
+def extractAppIDFromFile(fName, appIDRE, nRE):
+    result={"appID": [], "N": [], "name": []}
     with open(fName, "r") as fh:
         for line in fh:
-            reMatch=reExp.match(line)
-            if(reMatch is not None):
-                result.append(reMatch.groups()[0])
-                
+            nMatch=nRE.match(line)
+            if(nMatch is not None):
+                result["N"].append(int(nMatch.groups()[0]))
+            else:
+                idMatch=appIDRE.match(line)
+                if(idMatch is not None):
+                    result["name"].append(idMatch.groups()[0])
+                    result["appID"].append(idMatch.groups()[1])
     return result
-                
+
+def parseReleaseDate(rd):
+    try:
+        return dateutil.parser.parse(rd).timestamp()
+    except:
+        return -1
         
 
 alphaNumRE=re.compile("[^a-zA-Z0-9_]+", flags=re.UNICODE)
 
-appIDHtmlRE=re.compile(".*<a href=/app/([0-9]+)>.*", flags=re.UNICODE)
+appIDHtmlRE=re.compile(".*data-order=\"(.+)\">.*<a href=/app/([0-9]+)>.*", flags=re.UNICODE)
+appNHtmlRE=re.compile(".*<td>([0-9]+)</td>.*")
 
 steamSpyURL="https://steamspy.com/api.php"
 
@@ -43,16 +58,34 @@ steamSpyURL="https://steamspy.com/api.php"
 # eaList=pd.read_csv(steamEACSV, encoding="utf8")
 # eaList["nameAN"]=list(map(lambda name: str.lower(alphaNumRE.sub("", name)), eaList["Game"]))
 
-steamEAHtm="steamSpy_EA_List.html"
-steamEXEAHtm="steamSpy_EX_EA_List.html"
+steamEA="appAttrs/steamSpy_EA_List"
+steamEXEA="appAttrs/steamSpy_EX_EA_List"
 
-eaAppIDs=extractAppIDFromFile(steamEAHtm, appIDHtmlRE)
-exEAAppIDs=extractAppIDFromFile(steamEXEAHtm, appIDHtmlRE)
+appListFN="appAttrs/appTable.json"
 
-isEXEA=[True]*len(exEAAppIDs)
-isEXEA.extend([False]*len(eaAppIDs))
+eaAppIDs=pd.DataFrame(extractAppIDFromFile(steamEA+".html", appIDHtmlRE, appNHtmlRE))
+exEAAppIDs=pd.DataFrame(extractAppIDFromFile(steamEXEA+".html", appIDHtmlRE, appNHtmlRE))
 
-appIDs=copy.copy(exEAAppIDs)
-appIDs.extend(eaAppIDs)
+exEAAppIDs["status"]="finished"
+eaAppIDs["status"]="active"
 
-appIDs=pd.DataFrame({"appID": appIDs, "isEXEA": isEXEA})
+eaAppDetails=pd.read_csv(steamEA+".csv", encoding="utf-8")
+eaAppDetails.rename(columns={"#": "N"}, inplace=True)
+exEAAppDetails=pd.read_csv(steamEXEA+".csv", encoding="utf-8")
+exEAAppDetails.rename(columns={"#": "N"}, inplace=True)
+
+eaApp=eaAppIDs.merge(eaAppDetails, on="N")
+exEAApp=exEAAppIDs.merge(exEAAppDetails, on="N")
+
+appList=eaApp.append(exEAApp)
+
+appList["nameMatch"]=list(map(lambda n1, n2: n1==n2, appList["name"], appList["Game"]))
+appList.drop(["N", "Players", "Score rank(Userscore / Metascore)"], 1, inplace=True)
+
+appList["rTimeS"]=list(map(parseReleaseDate, appList["Release date"]))
+appList["hasRelease"]=list(map(lambda ts: ts>0, appList["rTimeS"]))
+appList=appList.groupby("hasRelease").get_group(True).copy()
+appList.reset_index(inplace=True)
+appList.drop(["hasRelease", "index"], 1, inplace=True)
+
+appList.to_json(appListFN)

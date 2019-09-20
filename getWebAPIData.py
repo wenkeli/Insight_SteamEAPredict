@@ -8,5 +8,5 @@ def getWebAPIDataJson(url, params={}):
     if(response.status_code==200):
         return json.loads(response.content.decode("utf8"))
     else:
-        raise requests.exceptions.RequestException
+        response.raise_for_status()
     
