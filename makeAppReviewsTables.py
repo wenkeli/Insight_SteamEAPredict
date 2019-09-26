@@ -6,6 +6,11 @@ import datetime
 import pandas as pd
 import numpy as np
 
+def formatTS(ts):
+    if(isinstance(ts, pd._libs.tslibs.timestamps.Timestamp)):
+        return ts.timestamp()
+    return ts
+
 appRevDir="appReviews"
 
 AppAttrDir="appAttrs"
@@ -53,5 +58,16 @@ appRevStatsFN="appAttrs/appRevVoteStat.json"
 allReviews.to_json(allReviewsFN)
 appRevStats.to_json(appRevStatsFN)
 
+allReviews["tsCreated"]=list(
+    map(formatTS, allReviews["timestamp_created"]))
+allReviews["tsUpdated"]=list(
+    map(formatTS, allReviews["timestamp_updated"]))
+allReviews["tsDevRes"]=list(
+    map(formatTS, allReviews["timestamp_dev_responded"])
+)
 
+allReviews.drop(
+    ["timestamp_created", "timestamp_updated", "developer_response",
+     "timestamp_dev_responded", "language"], 1, inplace=True)
 
+allReviews.to_json("appReviews/allReviewsCleaned.json")
