@@ -89,3 +89,18 @@ appList.reset_index(inplace=True)
 appList.drop(["hasRelease", "index"], 1, inplace=True)
 
 appList.to_json(appListFN)
+
+appAttrDir="appAttrs"
+
+compApps=appList.set_index(["status"]).loc["finished"].reset_index()
+actApps=appList.set_index(["status"]).loc["active"].reset_index()
+
+dupApps=compApps[["appID"]].merge(actApps[["appID"]])
+compKeepIDs=pd.DataFrame(
+    {"appID": list(set(compApps["appID"])-set(dupApps["appID"]))})
+compApps=compApps.merge(compKeepIDs)
+
+appTableClean=compApps.append(actApps)
+appTableClean.reset_index(inplace=True)
+appTableClean.drop(["index"], 1, inplace=True)
+appTableClean.to_json(os.path.join(appAttrDir, "appTableClean.json"))
