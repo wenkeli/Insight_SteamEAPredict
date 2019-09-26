@@ -87,6 +87,8 @@ def calcParams(aT, aNT, aNTCol, aRT, aRTCol, startS, endS):
 
 nSPerDay=3600*24
 
+days=np.r_[30:301:30]
+
 appAttrDir="appAttrs"
 appNewsDir="appNews"
 appRevsDir="appReviews"
@@ -97,11 +99,22 @@ appNews=pd.read_json(os.path.join(appNewsDir, "appNewsProcessed.json"), encoding
 appRevs=pd.read_json(os.path.join(appRevsDir, "appReviewsProcessed.json"), encoding="utf-8")
 
 
-features90Days=calcParams(selApps, appNews, "t-ref", appRevs, "tC-ref", 0, 90*nSPerDay)
-features90Days.to_json(os.path.join(appFeatureDir, "90Days.json"))
+# features90Days=calcParams(selApps, appNews, "t-ref", appRevs, "tC-ref", 0, 90*nSPerDay)
+# features90Days.to_json(os.path.join(appFeatureDir, "90Days.json"))
+#
+# features180Days=calcParams(selApps, appNews, "t-ref", appRevs, "tC-ref", 0, 180*nSPerDay)
+# features180Days.to_json(os.path.join(appFeatureDir, "180Days.json"))
+#
+# features300Days=calcParams(selApps, appNews, "t-ref", appRevs, "tC-ref", 0, 300*nSPerDay)
+# features300Days.to_json(os.path.join(appFeatureDir, "300Days.json"))
 
-features180Days=calcParams(selApps, appNews, "t-ref", appRevs, "tC-ref", 0, 180*nSPerDay)
-features180Days.to_json(os.path.join(appFeatureDir, "180Days.json"))
+features=pd.DataFrame()
+for day in days:
+    print(day)
+    dayFeature=calcParams(selApps, appNews, "t-ref", appRevs, "tC-ref", 0, day*nSPerDay)
+    dayFeature["dayAge"]=day
+    features=features.append(dayFeature)
 
-features300Days=calcParams(selApps, appNews, "t-ref", appRevs, "tC-ref", 0, 300*nSPerDay)
-features300Days.to_json(os.path.join(appFeatureDir, "300Days.json"))
+features.reset_index(inplace=True)
+features.drop(["index"], 1, inplace=True)
+features.to_json(os.path.join(appFeatureDir, "allDays.json"))
