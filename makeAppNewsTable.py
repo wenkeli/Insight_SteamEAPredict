@@ -18,13 +18,15 @@ for fileName in fileNames:
         with open(fPath, "r") as fh:
             data=json.load(fh)
         data=pd.DataFrame(data["appnews"]["newsitems"])
-        data=data[["title", "author", "feedlabel", "feedname", "appid", "date"]]
+        data=data[["gid", "title", "author", "feedlabel", "feedname", "appid", "date"]]
         allNews=allNews.append(data)
     except:
-        continue;
+        continue
 
 allNewsFN="appNews/allNews.json"
 
+allNews.drop_duplicates(subset=["gid"], inplace=True)
+allNews.drop(["gid"], 1, inplace=True)
 allNews.reset_index(inplace=True)
 allNews.drop(["index"], 1, inplace=True)
 allNews.to_json(allNewsFN)
