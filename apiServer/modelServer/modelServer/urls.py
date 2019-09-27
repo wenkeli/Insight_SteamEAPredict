@@ -22,4 +22,4 @@ urlpatterns = [
 ]
 
 urlpatterns+=[
-    url('predict/', include('predsuccess.urls')),]
+    url('predict', include('predsuccess.urls')),]

@@ -118,7 +118,7 @@ def calcAppFeatures(appTable, appNews, appRevs, startS, endS):
         tsArr=np.sort(np.hstack([np.array(df[tsCol]), endT]))
         tsDiff=np.diff(tsArr)
         return pd.DataFrame({tsCol: [tsArr], tsCol+"Diff": [tsDiff]})
-
+    appID=appTable.iloc[0]["appID"]
     aNTCol="t-ref"
     aRTCol="tC-ref"
     if(len(appNews)>0):
