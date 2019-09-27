@@ -17,8 +17,9 @@ def predictSuccess(request):
         appData["appTable"], appData["appNews"], appData["appRevs"], 0, 90*3600*24)
     
     predLabel=clModel.predict(appFeatures[featList])[0]
-    predProb=clModel.predict_proba(appFeatures[featList])[0][1]
+    predProb=int(clModel.predict_proba(appFeatures[featList])[0][1]*100)
     
     result={"predictCat": predLabel, "successProb": predProb}
+    print(result)
     
     return HttpResponse(json.dumps(result))
