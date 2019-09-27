@@ -1,6 +1,6 @@
 import re
 import datetime
-import dateutil
+import dateutil.parser as dateParser
 
 import urllib
 import requests
@@ -32,7 +32,7 @@ def extractAppIDFromFile(fName, appIDRE, nRE):
 
 def parseReleaseDate(rd):
     try:
-        return dateutil.parser.parse(rd).timestamp()
+        return dateParser.parse(rd).timestamp()
     except:
         return -1
         
