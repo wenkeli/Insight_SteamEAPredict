@@ -3,6 +3,8 @@ import os
 import pandas as pd
 import numpy as np
 
+import pickle
+
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 
@@ -43,16 +45,18 @@ def trainTest(df, model, nSplits=4):
     for i in np.arange(nSplits):
         fitSet = dataSets["fit"]["fail"][i]
         fitSet = fitSet.append(dataSets["fit"]["success"][i])
-        fitSetCols=fitSet.columns
-        model.fit(fitSet.drop(["appID", "category", "refTS"], 1), fitSet["category"])
+        fitData=fitSet.drop(["appID", "category", "refTS"], 1)
+        fitDCols=fitData.columns
+        fitCatCol="category"
+        model.fit(fitData, fitSet["category"])
 
         testSet = dataSets["val"]["fail"][i]
         testSet = testSet.append(dataSets["val"]["success"][i])
-        testSet=testSet[fitSetCols].copy()
-        testRes = testSet[["category"]].copy()
-        pred = model.predict(testSet.drop(["appID", "category", "refTS"], 1))
-        testRes["predict"] = pred
-        print(testRes.groupby(["category", "predict"]).size())
+        pred = model.predict(testSet[fitDCols])
+        testSet["predict"] = pred
+        print(testSet.groupby(["category", "predict"]).size())
+        
+    return (fitDCols, fitCatCol)
 
     
 appFeatureDir="appFeatures"
@@ -63,5 +67,10 @@ app180Days=pd.read_json(os.path.join(appFeatureDir, "180Days.json"))
 
 app300Days=pd.read_json(os.path.join(appFeatureDir, "300Days.json"))
 
-rfC = RandomForestClassifier(n_estimators=100, max_depth=2, random_state=0, class_weight="balanced_subsample")
+rfC = RandomForestClassifier(n_estimators=100, max_depth=5, random_state=0, class_weight="balanced_subsample")
 logC = LogisticRegression(class_weight="balanced", solver="lbfgs")
+
+(fitDCols, fitCatCol)=trainTest(app90Days, rfC, nSplits=4)
+
+with open("../apiServer/modelData/model.pkl", "wb") as fh:
+    pickle.dump({"model": rfC, "featureCols": list(fitDCols)}, fh)
