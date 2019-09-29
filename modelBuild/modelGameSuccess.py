@@ -8,6 +8,19 @@ import pickle
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 
+import matplotlib
+
+matplotlib.use("pdf")
+
+import matplotlib.pyplot as pp
+import matplotlib.backends.backend_pdf as pdf
+import matplotlib.gridspec as gs
+
+import seaborn as sns
+
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
+
 def makeTrainValSets(df, catCol, nSplits=4):
     splitFrac=1/nSplits
     cats=df[catCol].unique()
@@ -58,6 +71,42 @@ def trainTest(df, model, nSplits=4):
         
     return (fitDCols, fitCatCol)
 
+def makeROC(df, model, nSplits=4):
+    dataSets = makeTrainValSets(df, "category", nSplits=nSplits)
+    for i in np.arange(nSplits):
+        fitSet = dataSets["fit"]["fail"][i]
+        fitSet = fitSet.append(dataSets["fit"]["success"][i])
+        fitData=fitSet.drop(["appID", "category", "refTS"], 1)
+        fitDCols=fitData.columns
+        fitCatCol="category"
+        model.fit(fitData, fitSet["category"])
+
+        testSet = dataSets["val"]["fail"][i]
+        testSet = testSet.append(dataSets["val"]["success"][i])
+        
+        pred = model.predict_proba(testSet[fitDCols])
+        testSet["predict"] = pred[:,1]
+        
+        threshArr=np.r_[0.01:1:0.01]
+        falsePos=[]
+        truePos=[]
+        catSizes=testSet.groupby(["category"]).size()
+        for thresh in threshArr:
+            testSet["predCat"]=testSet["predict"]>thresh
+            
+            catPredSizes=testSet.groupby(["category", "predCat"]).size()
+            
+            try:
+                falsePos.append(catPredSizes.loc["fail", True]/np.float(catSizes.loc["fail"]))
+            except KeyError:
+                falsePos.append(0)
+            try:
+                truePos.append(catPredSizes.loc["success", True]/catSizes.loc["success"])
+            except KeyError:
+                truePos.append(0)
+        
+    return np.vstack([falsePos, truePos])
+
     
 appFeatureDir="appFeatures"
 
@@ -69,6 +118,21 @@ app300Days=pd.read_json(os.path.join(appFeatureDir, "300Days.json"))
 
 rfC = RandomForestClassifier(n_estimators=100, max_depth=5, random_state=0, class_weight="balanced_subsample")
 logC = LogisticRegression(class_weight="balanced", solver="lbfgs")
+
+roc=makeROC(app90Days, logC, nSplits=4)
+pages = pdf.PdfPages("plots/logC_ROC.pdf")
+fig = pp.figure(figsize=(5, 5))
+ax = fig.add_subplot(111)
+sns.lineplot(roc[0,:], roc[1,:], color="b", ax=ax)
+sns.lineplot([0, 1], [0, 1], color="grey", ax=ax)
+ax.set_xlim([0, 1])
+ax.set_ylim([0, 1])
+ax.set_xlabel("false positive rate")
+ax.set_ylabel("true positive rate")
+fig.suptitle("ROC")
+pages.savefig(fig)
+pp.close(fig)
+pages.close()
 
 (fitDCols, fitCatCol)=trainTest(app90Days, rfC, nSplits=4)
 
