@@ -31,7 +31,11 @@ def getAppDetails(appID):
 def readAppNews(appID):
     url="http://api.steampowered.com/ISteamNews/GetNewsForApp/v0002/"
     header={"appid": appID, "count": "10000", "maxlength": 1000, "format": "json"}
-    return getWebAPIDataJson(url, params=header)
+    newsData=getWebAPIDataJson(url, params=header)
+    print(newsData)
+    print(newsData.__class__)
+    print(newsData.keys())
+    return newsData
 
 
 def readAppReviews(appID):
@@ -143,6 +147,10 @@ def calcAppFeatures(appTable, appNews, appRevs, startS, endS):
             appTable.reset_index(inplace=True)
             appTable.drop(["0N"], 1, inplace=True)
             appTable=appTable.groupby("appID").get_group(appID)
+        else:
+            appTable["nNews"]=0
+            appTable["maxUpI"]=endS
+            
     else:
         appTable["nNews"]=0
         appTable["maxUpI"]=endS
@@ -224,6 +232,24 @@ def calcAppFeatures(appTable, appNews, appRevs, startS, endS):
                 appTable["votesFunnyN"]=0
                 appTable["nCommentsN"]=0
                 appTable["devResN"]=0
+        else:
+            appTable["nRevs"]=0
+            appTable["votesUp"]=0
+            appTable["votesFunny"]=0
+            appTable["nComments"]=0
+            appTable["devRes"]=0
+    
+            appTable["nPRevs"]=0
+            appTable["votesUpP"]=0
+            appTable["votesFunnyP"]=0
+            appTable["nCommentsP"]=0
+            appTable["devResP"]=0
+        
+            appTable["nNRevs"]=0
+            appTable["votesUpN"]=0
+            appTable["votesFunnyN"]=0
+            appTable["nCommentsN"]=0
+            appTable["devResN"]=0
         
     else:
         appTable["nRevs"]=0
