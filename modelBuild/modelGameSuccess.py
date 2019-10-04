@@ -168,7 +168,7 @@ logCV=LogisticRegressionCV(Cs=20, fit_intercept=True, penalty="l2",
 dataSizes=app90Days.groupby(["category"]).size().reset_index()
 dataSizes.rename(columns={0: "size"}, inplace=True)
 pages=pdf.PdfPages("plots/dataSizes.pdf")
-fig=pp.figure(figsize=(5, 5))
+fig=pp.figure(figsize=(3, 3))
 ax=fig.add_subplot(111)
 ax.bar([0, 1], dataSizes["size"], color=["m", "c"])
 ax.set_xticks([0, 1])
