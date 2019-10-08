@@ -7,6 +7,7 @@ import pickle
 
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
+from sklearn.metrics import roc_auc_score
 
 import matplotlib
 
@@ -96,6 +97,7 @@ def makeModelCurves(df, model, nSplits=4):
         
         pred = model.predict_proba(testSet[fitDCols])
         testSet["predict"] = pred[:,1]
+#         print(testSet.iloc[0])
         
         threshArr=np.r_[0.01:1:0.01]
         falsePos=[]
@@ -128,13 +130,14 @@ def makeModelCurves(df, model, nSplits=4):
         trueNeg=np.array(trueNeg)
         truePos=np.array(truePos)
         falseNeg=np.array(falseNeg)
-    return pd.DataFrame({"falsePos": falsePos, "trueNeg": trueNeg, 
+#     print(testSet.iloc[0])
+    return (pd.DataFrame({"falsePos": falsePos, "trueNeg": trueNeg, 
             "truePos": truePos, "falseNeg": falseNeg,
             "percision": truePos/(truePos+falsePos),
             "recall": truePos/(truePos+falseNeg),
             "truePosFrac": truePos/(truePos+falseNeg),
             "falsePosFrac": falsePos/(falsePos+trueNeg),
-            "thresh": threshArr})
+            "thresh": threshArr}), testSet, fitDCols)
 
     
 appFeatureDir="appFeatures"
@@ -179,48 +182,40 @@ pages.savefig(fig)
 pp.close(fig)
 pages.close()
 
-model=logCV
-dataSets = makeTrainValSets(app90Days, "category", nSplits=4)
 
-for i in np.arange(4):
-    fitSet = dataSets["fit"]["success"][i]
+modelCs, testSet, fitDCols=makeModelCurves(app90Days, gbC, nSplits=4)
+
+testSetByCat=testSet.set_index("category")
+failGProbas=np.array(testSetByCat.loc["fail", "predict"])
+sucGProbas=np.array(testSetByCat.loc["success", "predict"])
+
+featureWeights=pd.DataFrame({"weight": gbC.feature_importances_,
+                             "feature": fitDCols})
+featureWeights.to_csv("plots/featureWs.csv")
+
+binCenters=np.r_[0:1.001:0.01]
+sucFracs=[]
+for bC in binCenters:
+    bCL=bC-0.05
+    if bCL<0:
+        bCL=0
+    bCH=bC+0.05
+    if bCH>1:
+        bCH=1
+    failCount=np.sum((failGProbas>bCL) & (failGProbas<bCH))
+    sucCount=np.sum((sucGProbas>bCL) & (sucGProbas<bCH))
+    sucFracs.append(sucCount/(sucCount+failCount))
+sucFracs=np.array(sucFracs)
+
+print(roc_auc_score(testSet["category"], testSet["predict"]))
+
+with open("../apiServer/modelData/gbCModel.pkl", "wb") as fh:
+    pickle.dump({"model": gbC, "featureCols": list(fitDCols), "testData": testSet,
+                 "successFracs": sucFracs, "scoreBinCenters": binCenters}, fh)
     
-    failFitSet=dataSets["fit"]["fail"][i]
-    failFitSet=failFitSet.sample(n=len(fitSet))
-    fitSet=fitSet.append(failFitSet)
-    fitData=fitSet.drop(["appID", "category", "refTS"], 1)
-    fitDCols=fitData.columns
-    fitCatCol="category"
-    model.fit(fitData, fitSet["category"])
-
-    testSet = dataSets["val"]["fail"][i]
-    testSet = testSet.append(dataSets["val"]["success"][i])
-    pred = model.predict(testSet[fitDCols])
     
-    scores=model.predict_proba(testSet[fitDCols])
-    scoreDF=pd.DataFrame({"score": scores[:,1], "category": testSet["category"]})
     
-    testSet["predict"] = pred
-    print(testSet.groupby(["category", "predict"]).size())
 
-
-pages = pdf.PdfPages("plots/logCV_scores.pdf")
-fig = pp.figure(figsize=(5, 5))
-ax = fig.add_subplot(111)
-ax.hist(scoreDF[scoreDF["category"]=="fail"].score, color="b", alpha=0.3)
-ax.hist(scoreDF[scoreDF["category"]=="success"].score, color="r", alpha=0.3)
-# ax.set_xlim([0, 1])
-# ax.set_ylim([0, 1])
-# ax.set_xlabel("false positive rate")
-# ax.set_ylabel("true positive rate")
-# fig.suptitle("ROC")
-pages.savefig(fig)
-pp.close(fig)
-pages.close()
-
-
-
-modelCs=makeModelCurves(app90Days, gbC, nSplits=4)
 pages = pdf.PdfPages("plots/gbC_PvR.pdf")
 fig = pp.figure(figsize=(3, 3))
 ax = fig.add_subplot(111)
@@ -241,7 +236,53 @@ pages.savefig(fig)
 pp.close(fig)
 pages.close()
 
-(fitDCols, fitCatCol)=trainTest(app90Days, rfC, nSplits=4)
+pages = pdf.PdfPages("plots/gbC_F1.pdf")
+fig = pp.figure(figsize=(3, 3))
+ax = fig.add_subplot(111)
+sns.lineplot(modelCs["thresh"], modelCs["recall"], color="r", ax=ax, lw=5)
+sns.lineplot(modelCs["thresh"], modelCs["percision"], color="b", ax=ax, lw=5)
+sns.lineplot(modelCs["thresh"], 
+             2*modelCs["percision"]*modelCs["recall"]/(modelCs["percision"]+modelCs["recall"]),
+             color="m", ax=ax, lw=5)
+ax.set_xlim([0, 1])
+ax.set_ylim([0, 1])
+ax.set_xlabel("thresh")
+ax.set_ylabel("score")
+pages.savefig(fig)
+pp.close(fig)
+pages.close()
 
-with open("../apiServer/modelData/model.pkl", "wb") as fh:
-    pickle.dump({"model": rfC, "featureCols": list(fitDCols)}, fh)
+pages = pdf.PdfPages("plots/gbC_ROC.pdf")
+fig = pp.figure(figsize=(3, 3))
+ax = fig.add_subplot(111)
+sns.lineplot(modelCs["falsePos"]/(modelCs["falsePos"]+modelCs["trueNeg"]),
+             modelCs["truePos"]/(modelCs["truePos"]+modelCs["falseNeg"]),
+             color="r", ax=ax, lw=5)
+sns.lineplot([0, 1], [0, 1], color="b", ax=ax, lw=3)
+ax.set_xlim([0, 1])
+ax.set_ylim([0, 1])
+ax.set_xlabel("true positive fraction")
+ax.set_ylabel("false positive fraction")
+pages.savefig(fig)
+pp.close(fig)
+pages.close()
+
+pages = pdf.PdfPages("plots/gbC_scores.pdf")
+fig = pp.figure(figsize=(5, 5))
+ax = fig.add_subplot(111)
+ax.hist(failGProbas, bins, color="b", alpha=0.8)
+ax.hist(sucGProbas, bins, color="r", alpha=0.8)
+# ax.set_xlim([0, 1])
+# ax.set_ylim([0, 1])
+ax.set_xlabel("model score")
+ax.set_ylabel("# of games")
+# fig.suptitle("ROC")
+pages.savefig(fig)
+pp.close(fig)
+pages.close()
+
+
+# (fitDCols, fitCatCol)=trainTest(app90Days, rfC, nSplits=4)
+
+# with open("../apiServer/modelData/model.pkl", "wb") as fh:
+#     pickle.dump({"model": rfC, "featureCols": list(fitDCols)}, fh)
