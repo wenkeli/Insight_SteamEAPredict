@@ -212,74 +212,7 @@ print(roc_auc_score(testSet["category"], testSet["predict"]))
 with open("../apiServer/modelData/gbCModel.pkl", "wb") as fh:
     pickle.dump({"model": gbC, "featureCols": list(fitDCols), "testData": testSet,
                  "successFracs": sucFracs, "scoreBinCenters": binCenters}, fh)
-    
-    
-    
 
-pages = pdf.PdfPages("plots/gbC_PvR.pdf")
-fig = pp.figure(figsize=(3, 3))
-ax = fig.add_subplot(111)
-sns.lineplot(modelCs["recall"], modelCs["percision"], color="r", ax=ax, lw=7)
-ax.axhline(0.2, lw=3, color="blue")
-ax.axvline(0.5, lw=2, color="m")
-ax.axhline(0.5, lw=2, color="m")
-# sns.lineplot(modelCs["thresh"], modelCs["recall"], color="r", ax=ax, lw=2)
-# sns.lineplot(modelCs["thresh"], 
-#              2*modelCs["percision"]*modelCs["recall"]/(modelCs["percision"]+modelCs["recall"]),
-#              ax=ax)
-# sns.lineplot([0, 1], [0, 1], color="grey", ax=ax)
-ax.set_xlim([0, 1])
-ax.set_ylim([0, 1])
-ax.set_xlabel("recall")
-ax.set_ylabel("percision")
-pages.savefig(fig)
-pp.close(fig)
-pages.close()
-
-pages = pdf.PdfPages("plots/gbC_F1.pdf")
-fig = pp.figure(figsize=(3, 3))
-ax = fig.add_subplot(111)
-sns.lineplot(modelCs["thresh"], modelCs["recall"], color="r", ax=ax, lw=5)
-sns.lineplot(modelCs["thresh"], modelCs["percision"], color="b", ax=ax, lw=5)
-sns.lineplot(modelCs["thresh"], 
-             2*modelCs["percision"]*modelCs["recall"]/(modelCs["percision"]+modelCs["recall"]),
-             color="m", ax=ax, lw=5)
-ax.set_xlim([0, 1])
-ax.set_ylim([0, 1])
-ax.set_xlabel("thresh")
-ax.set_ylabel("score")
-pages.savefig(fig)
-pp.close(fig)
-pages.close()
-
-pages = pdf.PdfPages("plots/gbC_ROC.pdf")
-fig = pp.figure(figsize=(3, 3))
-ax = fig.add_subplot(111)
-sns.lineplot(modelCs["falsePos"]/(modelCs["falsePos"]+modelCs["trueNeg"]),
-             modelCs["truePos"]/(modelCs["truePos"]+modelCs["falseNeg"]),
-             color="r", ax=ax, lw=5)
-sns.lineplot([0, 1], [0, 1], color="b", ax=ax, lw=3)
-ax.set_xlim([0, 1])
-ax.set_ylim([0, 1])
-ax.set_xlabel("true positive fraction")
-ax.set_ylabel("false positive fraction")
-pages.savefig(fig)
-pp.close(fig)
-pages.close()
-
-pages = pdf.PdfPages("plots/gbC_scores.pdf")
-fig = pp.figure(figsize=(5, 5))
-ax = fig.add_subplot(111)
-ax.hist(failGProbas, bins, color="b", alpha=0.8)
-ax.hist(sucGProbas, bins, color="r", alpha=0.8)
-# ax.set_xlim([0, 1])
-# ax.set_ylim([0, 1])
-ax.set_xlabel("model score")
-ax.set_ylabel("# of games")
-# fig.suptitle("ROC")
-pages.savefig(fig)
-pp.close(fig)
-pages.close()
 
 
 # (fitDCols, fitCatCol)=trainTest(app90Days, rfC, nSplits=4)
