@@ -35,19 +35,32 @@ cARFNAppN=np.arange(cARFN.size)
 cARFNAppF=cARFNAppN/cARFN.size
 
 aANR=np.sort(np.array(actAppAges["Now-R"]))[::-1]
-aANR=aANR[aANR>90]
+aANR=aANR[aANR>0]
 aANRAppN=np.arange(aANR.size)
 aANRAppF=aANRAppN/aANR.size
 
-pages = pdf.PdfPages("plots/compApp_RFN.pdf")
-fig = pp.figure(figsize=(5, 7))
+pages = pdf.PdfPages("plots/compApp_RFN_hist.pdf")
+fig = pp.figure(figsize=(7, 5))
 ax = fig.add_subplot(111)
-sns.lineplot(cARFN, cARFNAppN/len(cARFNAppN), color="b", ax=ax)
+sns.distplot(cARFN, color="r", norm_hist=False, kde=False, ax=ax)
 # sns.lineplot(aANR, aANRAppN, color="r", ax=ax)
+ax.axvline(600, lw=2, color="white")
 ax.set_xlim([90, 1500])
 ax.set_xlabel("days")
-ax.set_ylabel("# games")
-fig.suptitle("dev age of completed games")
+ax.set_ylabel("# of games")
+pages.savefig(fig)
+pp.close(fig)
+pages.close()
+
+pages = pdf.PdfPages("plots/actApp_nowR_hist.pdf")
+fig = pp.figure(figsize=(7, 5))
+ax = fig.add_subplot(111)
+sns.distplot(aANR, color="b", norm_hist=False, kde=False, ax=ax)
+# sns.lineplot(aANR, aANRAppN, color="r", ax=ax)
+# ax.axvline(600, lw=2, color="white")
+ax.set_xlim([0, 1500])
+ax.set_xlabel("days")
+ax.set_ylabel("# of games")
 pages.savefig(fig)
 pp.close(fig)
 pages.close()
