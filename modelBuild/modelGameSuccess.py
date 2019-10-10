@@ -82,20 +82,53 @@ def trainTest(df, model, nSplits=4):
         
     return (fitDCols, fitCatCol)
 
-def makeModelCurves(df, model, nSplits=4):
+def normalizeData(df, cols, meanSeries=None, stdSeries=None):
+    retDF=df.copy()
+    meanArr=[]
+    stdArr=[]
+    for col in cols:
+        if(meanSeries is None) and (stdSeries is None):
+            colMean=np.nanmean(retDF[col])
+            colStd=np.nanstd(retDF[col])
+        else:
+            colMean=meanSeries[col]
+            colStd=stdSeries[col]
+        retDF[col]=(retDF[col]-colMean)/colStd
+        meanArr.append(colMean)
+        stdArr.append(colStd)
+    
+    return (retDF, pd.Series(data=meanArr, index=cols), pd.Series(data=stdArr, index=cols))
+
+def makeModelCurves(df, model, nSplits=4, balanceRatio=None, normalize=False):
     dataSets = makeTrainValSets(df, "category", nSplits=nSplits)
     for i in np.arange(nSplits):
-        fitSet = dataSets["fit"]["fail"][i]
-        fitSet = fitSet.append(dataSets["fit"]["success"][i])
+        fitSetFail = dataSets["fit"]["fail"][i]
+        fitSetSuc = dataSets["fit"]["success"][i]
+        if balanceRatio is not None:
+            if len(fitSetFail)>len(fitSetSuc):
+                fitSetFail=fitSetFail.sample(int(len(fitSetSuc)*balanceRatio))
+            else:
+                fitSetSuc=fitSetSuc.sample(int(len(fitSetFail)*balanceRatio))
+        fitSet=fitSetFail.append(fitSetSuc)
+        
         fitData=fitSet.drop(["appID", "category", "refTS"], 1)
         fitDCols=fitData.columns
-        fitCatCol="category"
-        model.fit(fitData, fitSet["category"])
+        if normalize:
+            fitDataNorm, fitDataMean, fitDataStd=normalizeData(
+                fitData, fitDCols)
+            model.fit(fitDataNorm, fitSet["category"])
+        else:
+            model.fit(fitData, fitSet["category"])
 
-        testSet = dataSets["val"]["fail"][i]
-        testSet = testSet.append(dataSets["val"]["success"][i])
-        
-        pred = model.predict_proba(testSet[fitDCols])
+        testSetFail = dataSets["val"]["fail"][i]
+        testSetSuc = dataSets["val"]["success"][i]
+        testSet=testSetSuc.append(testSetFail)
+        if normalize:
+            testSetNorm, _, _=normalizeData(
+                testSet, fitDCols, meanSeries=fitDataMean, stdSeries=fitDataStd)
+            pred = model.predict_proba(testSetNorm[fitDCols])
+        else:
+            pred = model.predict_proba(testSet[fitDCols])
         testSet["predict"] = pred[:,1]
 #         print(testSet.iloc[0])
         
@@ -131,13 +164,19 @@ def makeModelCurves(df, model, nSplits=4):
         truePos=np.array(truePos)
         falseNeg=np.array(falseNeg)
 #     print(testSet.iloc[0])
-    return (pd.DataFrame({"falsePos": falsePos, "trueNeg": trueNeg, 
-            "truePos": truePos, "falseNeg": falseNeg,
-            "percision": truePos/(truePos+falsePos),
-            "recall": truePos/(truePos+falseNeg),
-            "truePosFrac": truePos/(truePos+falseNeg),
-            "falsePosFrac": falsePos/(falsePos+trueNeg),
-            "thresh": threshArr}), testSet, fitDCols)
+
+    retData=(pd.DataFrame(
+        {"falsePos": falsePos, "trueNeg": trueNeg, 
+         "truePos": truePos, "falseNeg": falseNeg,
+         "percision": truePos/(truePos+falsePos),
+         "recall": truePos/(truePos+falseNeg),
+         "truePosFrac": truePos/(truePos+falseNeg),
+         "falsePosFrac": falsePos/(falsePos+trueNeg),
+         "thresh": threshArr}),
+        testSet, fitDCols)
+    if normalize:
+        retData=retData+(fitDataMean, fitDataStd)
+    return retData
 
     
 appFeatureDir="appFeatures"
@@ -147,6 +186,22 @@ app90Days=pd.read_json(os.path.join(appFeatureDir, "90Days.json"))
 app180Days=pd.read_json(os.path.join(appFeatureDir, "180Days.json"))
 
 app300Days=pd.read_json(os.path.join(appFeatureDir, "300Days.json"))
+
+
+dataSizes=app90Days.groupby(["category"]).size().reset_index()
+dataSizes.rename(columns={0: "size"}, inplace=True)
+pages=pdf.PdfPages("plots/dataSizes.pdf")
+fig=pp.figure(figsize=(3, 3))
+ax=fig.add_subplot(111)
+ax.bar([0, 1], dataSizes["size"], color=["m", "c"])
+ax.set_xticks([0, 1])
+ax.set_xticklabels(dataSizes["category"])
+ax.set_xlabel("")
+ax.set_ylabel("# of games")
+pages.savefig(fig)
+pp.close(fig)
+pages.close()
+
 
 rfC = RandomForestClassifier(n_estimators=100, max_depth=5, random_state=0, class_weight="balanced_subsample")
 gbC = GradientBoostingClassifier(loss="deviance", learning_rate=0.1, n_estimators=100, subsample=1.0, 
@@ -167,23 +222,11 @@ logCV=LogisticRegressionCV(Cs=20, fit_intercept=True, penalty="l2",
 #                "n_jobs": [None], "penalty": ["elasticnet"], "random_state": [None], "solver": ["saga"],
 #                "tol": [0.0001], "verbose":[0], "warm_start": [False]}
 
+modelCs, testSet, fitDCols, colMeans, colStds=makeModelCurves(
+    app90Days, logCV, nSplits=4, balanceRatio=1, normalize=True)
 
-dataSizes=app90Days.groupby(["category"]).size().reset_index()
-dataSizes.rename(columns={0: "size"}, inplace=True)
-pages=pdf.PdfPages("plots/dataSizes.pdf")
-fig=pp.figure(figsize=(3, 3))
-ax=fig.add_subplot(111)
-ax.bar([0, 1], dataSizes["size"], color=["m", "c"])
-ax.set_xticks([0, 1])
-ax.set_xticklabels(dataSizes["category"])
-ax.set_xlabel("")
-ax.set_ylabel("# of games")
-pages.savefig(fig)
-pp.close(fig)
-pages.close()
-
-
-modelCs, testSet, fitDCols=makeModelCurves(app90Days, gbC, nSplits=4)
+modelCs, testSet, fitDCols=makeModelCurves(
+    app90Days, gbC, nSplits=4, balanceRatio=None, normalize=False)
 
 testSetByCat=testSet.set_index("category")
 failGProbas=np.array(testSetByCat.loc["fail", "predict"])
@@ -210,7 +253,7 @@ sucFracs=np.array(sucFracs)
 print(roc_auc_score(testSet["category"], testSet["predict"]))
 
 with open("../apiServer/modelData/gbCModel.pkl", "wb") as fh:
-    pickle.dump({"model": gbC, "featureCols": list(fitDCols), "testData": testSet,
+    pickle.dump({"model": gbC, "modelCs": modelCs,"featureCols": list(fitDCols), "testData": testSet,
                  "successFracs": sucFracs, "scoreBinCenters": binCenters}, fh)
 
 

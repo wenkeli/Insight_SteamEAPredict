@@ -30,6 +30,7 @@ fitDCols=modelData["featureCols"]
 testSet=modelData["testData"]
 sucFracs=modelData["successFracs"]
 binCenters=modelData["scoreBinCenters"]
+modelCs=modelData["modelCs"]
 
 pages = pdf.PdfPages("plots/gbC_PvR.pdf")
 fig = pp.figure(figsize=(3, 3))
