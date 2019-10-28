@@ -271,6 +271,7 @@ def calcAppFeatures(appTable, appNews, appRevs, startS, endS):
         appTable["devResN"]=0
         
     appTable=appTable.groupby("appID").get_group(appID)
+    print(appTable.iloc[0])
     return appTable
 
 

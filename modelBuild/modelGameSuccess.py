@@ -82,10 +82,11 @@ def trainTest(df, model, nSplits=4):
         
     return (fitDCols, fitCatCol)
 
-def normalizeData(df, cols, meanSeries=None, stdSeries=None):
+def normalizeData(df, cols, meanSeries=None, stdSeries=None, outlierThresh=None):
     retDF=df.copy()
     meanArr=[]
     stdArr=[]
+    keepArr=np.array([True]*len(retDF))
     for col in cols:
         if(meanSeries is None) and (stdSeries is None):
             colMean=np.nanmean(retDF[col])
@@ -94,8 +95,12 @@ def normalizeData(df, cols, meanSeries=None, stdSeries=None):
             colMean=meanSeries[col]
             colStd=stdSeries[col]
         retDF[col]=(retDF[col]-colMean)/colStd
+        if(outlierThresh is not None):
+            keepArr=keepArr & (np.abs(retDF[col])<outlierThresh)
         meanArr.append(colMean)
         stdArr.append(colStd)
+    
+    retDF=retDF[keepArr].copy()
     
     return (retDF, pd.Series(data=meanArr, index=cols), pd.Series(data=stdArr, index=cols))
 

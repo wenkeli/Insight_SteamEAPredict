@@ -39,15 +39,24 @@ aANR=aANR[aANR>0]
 aANRAppN=np.arange(aANR.size)
 aANRAppF=aANRAppN/aANR.size
 
-pages = pdf.PdfPages("plots/compApp_RFN_hist.pdf")
-fig = pp.figure(figsize=(7, 5))
+bins=np.r_[90:2001:100]
+aANRHist, _=np.histogram(aANR, bins)
+aANRHist=aANRHist/aANR.size
+
+cARFNHist, _=np.histogram(cARFN, bins)
+cARFNHist=cARFNHist/cARFN.size
+
+pages = pdf.PdfPages("plots/appDevAges_hist.pdf")
+fig = pp.figure(figsize=(9, 5))
 ax = fig.add_subplot(111)
-sns.distplot(cARFN, color="r", norm_hist=False, kde=False, ax=ax)
+ax.bar(bins[:-1], aANRHist, width=90, alpha=0.7, lw=0, color="c", align="edge")
+ax.bar(bins[:-1], cARFNHist, width=90, alpha=0.7, lw=0, color="r", align="edge")
+# sns.distplot(cARFN, bins=bins, color="r", norm_hist=False, kde=False, ax=ax, hist_kws={"alpha": 0.5})
 # sns.lineplot(aANR, aANRAppN, color="r", ax=ax)
-ax.axvline(600, lw=2, color="white")
-ax.set_xlim([90, 1500])
-ax.set_xlabel("days")
-ax.set_ylabel("# of games")
+ax.axvline(590, lw=2, color="white")
+ax.set_xlim([90, 2000])
+ax.set_xlabel("age (days)")
+ax.set_ylabel("fraction of games")
 pages.savefig(fig)
 pp.close(fig)
 pages.close()
@@ -55,7 +64,7 @@ pages.close()
 pages = pdf.PdfPages("plots/actApp_nowR_hist.pdf")
 fig = pp.figure(figsize=(7, 5))
 ax = fig.add_subplot(111)
-sns.distplot(aANR, color="b", norm_hist=False, kde=False, ax=ax)
+sns.distplot(aANR, bins=bins, color="c", norm_hist=True, kde=False, ax=ax)
 # sns.lineplot(aANR, aANRAppN, color="r", ax=ax)
 # ax.axvline(600, lw=2, color="white")
 ax.set_xlim([0, 1500])
